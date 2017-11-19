@@ -180,8 +180,8 @@ class ParticleFilter(object):
             new_particles.append(p)
 
 
-        '''
         # Algortihm 2 taken from the slides
+        '''
         new_particles = []
         N = self.num_particles
         r = random.uniform(0, 1.0 / N)
@@ -194,7 +194,6 @@ class ParticleFilter(object):
                 c = c + self.weights[idx]
             p = copy.copy(self.particles[idx])
             new_particles.append(p)
-            
         '''
 
         # Remove old particles
@@ -225,9 +224,11 @@ class ParticleFilter(object):
                 ym = y + r * sin(phi)
 
                 if xm > self.xmax or xm < self.xmin:
+                    r = max_range #fixme added after forum post
                     break
 
                 if ym > self.ymax or ym < self.ymin:
+                    r = max_range #fixme added after forum post
                     break
 
                 row, col = self.metric_to_grid_coords(xm, ym)
@@ -532,10 +533,11 @@ if __name__ == '__main__':
     num_particles = 50
 
     # Workspace boundaries in meters
-    xmin = -20
-    xmax = 20
-    ymin = -20
-    ymax = 20
+    # fixme changed from 20 to 10 after forum post
+    xmin = -10
+    xmax = 10
+    ymin = -10
+    ymax = 10
 
     mcl = MonteCarloLocalization(num_particles, xmin, xmax, ymin, ymax)
     mcl.run()
