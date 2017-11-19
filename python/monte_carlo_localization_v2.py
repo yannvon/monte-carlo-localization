@@ -118,36 +118,45 @@ class ParticleFilter(object):
         # http://timvieira.github.io/blog/post/2014/02/11/exp-normalize-trick/
         # if you think it is necessary
 
-        # n * exp(-||error||^2/beam_range_measurement_noise_std_dev^2)
-        # fixme what is n?
-        n = 1
-        # FIXME do trick?
-        self.weights = map(lambda squared_norm: n * exp(-squared_norm / self.beam_range_measurement_noise_std_dev ** 2),
+        # Note: we want to compute the following formula for all errors to get the weights of the particles:
+        # n * exp(-||error||^2/beam_range_measurement_noise_std_dev^2
+        # where n is the normalizing factor. For this I will use the trick mentioned above.
+
+        # Step 1: pre-operation
+        self.weights = map(lambda squared_norm: - squared_norm / self.beam_range_measurement_noise_std_dev**2,
                            errors)
+        # Step 2: add a constant to avoid underflow
+        b = min(errors)
+        self.weights = map(lambda x: exp(x - b), self.weights)
+
+        # Step 3: normalization of weights, will amount to same result as if b was not added,
+        # but without danger of underflow
+        s = sum(self.weights)
+        self.weights = map(lambda w: w / s, self.weights)
 
         # Do re sampling. Depending on how you implement it you might
         # or might not need to normalize your weights by their sum, so
         # they are treated as probabilities
-
-        # normalize weights
-        s = sum(self.weights)
-        self.weights = map(lambda w: w / s, self.weights)
 
         # compute effective sample size
         inverse = sum(map(lambda w: w ** 2, self.weights))
 
         N_eff = -1
         if inverse != 0:
-            N_eff = 1 / inverse
+            N_eff = 1.0 / inverse
 
-        N_tresh = (1 / len(self.particles))  # fixme lowest thresh possible
+
+        N_min = (1.0 / self.num_particles)  # fixme lowest thresh possible shold be 1?
+        N_max = self.num_particles
+
+
         print "effective sample size", N_eff
 
-        if N_eff > N_tresh:
+        if N_eff > N_min:
             self.resample()
 
     def resample(self):
-        """Implements resampling in particle filters"""
+        """Implements re sampling in particle filters"""
 
         # Sample particle i with probability that
         # is proportional to its weight w_i. Sampling
@@ -156,7 +165,7 @@ class ParticleFilter(object):
 
         # Algorithm 1 taken straight from slides
         new_particles = []
-        N = len(self.particles)
+        N = self.num_particles
         u = random.uniform(0, 1)
         idx = int(u * (N - 1))
         beta = 0
@@ -169,6 +178,24 @@ class ParticleFilter(object):
                 idx = (idx + 1) % N
             p = copy.copy(self.particles[idx])
             new_particles.append(p)
+
+
+        '''
+        # Algortihm 2 taken from the slides
+        new_particles = []
+        N = self.num_particles
+        r = random.uniform(0, 1.0 / N)
+        c = self.weights[0]
+        idx = 0
+        for n in range(1, N+1):
+            u = r + (n - 1.0) / N #fixme check not integer division
+            while u > c:
+                idx = idx + 1
+                c = c + self.weights[idx]
+            p = copy.copy(self.particles[idx])
+            new_particles.append(p)
+            
+        '''
 
         # Remove old particles
         self.particles = new_particles
@@ -284,7 +311,7 @@ class ParticleFilter(object):
         # Compute the difference between predicted ranges and actual ranges
         # Take the squared norm of that difference
         norm_error = sqrt(
-            sum(map(lambda (a, b): (a - b) ** 2, zip(actual_ranges, simulated_ranges))))  # fixme sqrt or not?
+            sum(map(lambda (a, b): (a - b)**2, zip(actual_ranges, simulated_ranges))))  # fixme sqrt or not?
 
         return norm_error ** 2
 
@@ -355,7 +382,7 @@ class ParticleFilter(object):
         gy = (y - self.ogm.info.origin.position.y) / self.ogm.info.resolution
         row = min(max(int(gy), 0), self.ogm.info.height)
         col = min(max(int(gx), 0), self.ogm.info.width)
-        return (row, col)
+        return row, col
 
 
 class MonteCarloLocalization(object):
